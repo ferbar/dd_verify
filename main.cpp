@@ -39,6 +39,13 @@
 
 #define min(a,b) (a < b ? a : b)
 const char *bold = BOLD, *norm = NORM;
+double starttime=0;
+size_t compareSize=0;
+
+int originalErrors=0;
+int targetErrors=0;
+int diffBlocks=0;
+int diffBytes=0;
 
 /**
  * @return different bytes
@@ -53,6 +60,40 @@ int compareAreas(const void *original, const void *target, int len) {
 	return ret;
 }
 
+void printProgress(size_t position) {
+	struct timespec spec;
+	clock_gettime(CLOCK_REALTIME, &spec);
+	double now=spec.tv_sec + (spec.tv_nsec / 1.0e9);
+	double percentDone=((double)(position) / compareSize );
+	static double last=0;
+	if(last == 0) {
+		last=starttime;
+	}
+	static size_t lastPosition=0;
+
+	char progress[51];
+	for(int i=0; i < sizeof(progress)-1; i++) {
+		if(i <= (percentDone * 100 / 2)) {
+			progress[i]='-';
+		} else {
+			progress[i]='.';
+		}
+	}
+	progress[50]='\0';
+
+
+		printf("\x1b[udd_rescue: (info): pos:   %skB\n"
+"                   errOriginal:      %d, errTarget: %d, diff blocks: %d, diff bytes: %d    \n"
+"                   +curr.rate:   %skB/s, avg.rate:     %skB/s, avg.load:  xx%%    \n"
+"                   >%s< %d%%  ETA:  %ds    \n",
+			fmt_int(10, 1, 1024, position, bold, norm, 1),
+			originalErrors, targetErrors, diffBlocks, diffBytes,
+			fmt_int(10, 1, 1024, (position-lastPosition)/(now-last), bold, norm, 1), fmt_int(10, 1, 1024,(position/(now-starttime)), bold, norm, 1),
+			progress,(int)(percentDone*100), (int) (percentDone > 0 ? (now-starttime)/percentDone -(now-starttime): -1)
+			);
+	last=now;
+	lastPosition=position;
+}
 
 int main(int argc, char *argv[]) {
 
@@ -105,7 +146,7 @@ int main(int argc, char *argv[]) {
 	if(originalSize != targetSize) {
 		printf("warning: original: %skB target: %skB\n", fmt_int(10, 1, 1024, originalSize, bold, norm, 1), fmt_int(10, 1, 1024, targetSize, bold, norm, 1)	);
 	}
-	size_t compareSize=min(originalSize, targetSize);
+	compareSize=min(originalSize, targetSize);
 
 	printf("dd_verify: (info): expect to compare %s from %s and %s\n", fmt_int(10, 1, 1024, compareSize, bold, norm, 1), argv[1], argv[2]);
 	void *originalBuffer=NULL;
@@ -113,20 +154,16 @@ int main(int argc, char *argv[]) {
 	void *targetBuffer=NULL;
 	posix_memalign(&targetBuffer, softbs, softbs);
 
-	int originalErrors=0;
-	int targetErrors=0;
-	int diffBlocks=0;
-	int diffBytes=0;
 	// save cursor position:
 	printf("\x1b[s");
 	size_t position=0;
 	struct timespec spec;
 	clock_gettime(CLOCK_REALTIME, &spec);
-	double starttime=spec.tv_sec + (spec.tv_nsec / 1.0e9);
-	double last=starttime;
+	starttime=spec.tv_sec + (spec.tv_nsec / 1.0e9);
 	double lastUpdate=0;
 
 	while(position < compareSize) {
+		// printf("startloop: position %zd\n", position);
 		ssize_t originalRc=read(original, originalBuffer, softbs);
 		bool originalSeek=false;
 		if(originalRc < 0) {
@@ -170,35 +207,17 @@ int main(int argc, char *argv[]) {
 			diffBytes+=d;
 		}
 
+		// printf("lastUpdate:%f\n",lastUpdate);
+		position+=originalRc;
 		clock_gettime(CLOCK_REALTIME, &spec);
 		double now=spec.tv_sec + (spec.tv_nsec / 1.0e9);
-		double percentDone=((double)(position+originalRc) / compareSize );
-
-		char progress[51];
-		for(int i=0; i < sizeof(progress)-1; i++) {
-			if(i <= (percentDone * 100 / 2)) {
-				progress[i]='-';
-			} else {
-				progress[i]='.';
-			}
-		}
-		progress[50]='\0';
-
 		if(lastUpdate < now - 0.1) {
-
-			printf("\x1b[udd_rescue: (info): pos:   %skB\n"
-	"                   errOriginal:      %d, errTarget: %d, diff blocks: %d, diff bytes: %d    \n"
-	"                   +curr.rate:   %skB/s, avg.rate:     %skB/s, avg.load:  xx%%    \n"
-	"                   >%s< %d%%  ETA:  %ds    \n",
-				fmt_int(10, 1, 1024, position, bold, norm, 1),
-				originalErrors, targetErrors, diffBlocks, diffBytes,
-				fmt_int(10, 1, 1024, (softbs/(now-last)), bold, norm, 1), fmt_int(10, 1, 1024,(position/(now-starttime)), bold, norm, 1),
-				progress,(int)(percentDone*100), (int) (percentDone > 0 ? (now-starttime)/percentDone -(now-starttime): -1)
-				);
+			printProgress(position);
 			lastUpdate=now;
 		}
-		last=now;
-		position+=softbs;
 		
 	}
+	printf("done: position: %s\n", fmt_int(10, 1, 1024, position, bold, norm, 1));
+	printProgress(position);
 }
+
