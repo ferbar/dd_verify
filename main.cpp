@@ -82,7 +82,7 @@ void printProgress(size_t position) {
 	progress[50]='\0';
 
 
-		printf("\x1b[udd_rescue: (info): pos:   %skB\n"
+		printf("\x1b[udd_verify: (info): pos:   %skB\n"
 "                   errOriginal:      %d, errTarget: %d, diff blocks: %d, diff bytes: %d    \n"
 "                   +curr.rate:   %skB/s, avg.rate:     %skB/s, avg.load:  xx%%    \n"
 "                   >%s< %d%%  ETA:  %ds    \n",
