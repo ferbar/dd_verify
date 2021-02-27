@@ -36,6 +36,10 @@
 #endif
 #endif
 
+#define ANSI_UP "\x1b[A"
+#define ANSI_RESTORE_POS "\x1b[u"
+#define ANSI_SAVE_Pos
+
 
 #define min(a,b) (a < b ? a : b)
 const char *bold = BOLD, *norm = NORM;
@@ -82,10 +86,11 @@ void printProgress(size_t position) {
 	progress[50]='\0';
 
 
-		printf("\x1b[udd_verify: (info): pos:   %skB\n"
+		printf("%sdd_verify: (info): pos:   %skB\n"
 "                   errOriginal:      %d, errTarget: %d, diff blocks: %d, diff bytes: %d    \n"
 "                   +curr.rate:   %skB/s, avg.rate:     %skB/s, avg.load:  xx%%    \n"
 "                   >%s< %d%%  ETA:  %ds    \n",
+			ANSI_UP ANSI_UP ANSI_UP ANSI_UP,
 			fmt_int(10, 1, 1024, position, bold, norm, 1),
 			originalErrors, targetErrors, diffBlocks, diffBytes,
 			fmt_int(10, 1, 1024, (position-lastPosition)/(now-last), bold, norm, 1), fmt_int(10, 1, 1024,(position/(now-starttime)), bold, norm, 1),
@@ -155,7 +160,7 @@ int main(int argc, char *argv[]) {
 	posix_memalign(&targetBuffer, softbs, softbs);
 
 	// save cursor position:
-	printf("\x1b[s");
+	// printf("\x1b[s");
 	size_t position=0;
 	struct timespec spec;
 	clock_gettime(CLOCK_REALTIME, &spec);
